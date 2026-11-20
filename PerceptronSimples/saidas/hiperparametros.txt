@@ -1,0 +1,12 @@
+AND
+alpha: 0.1
+max_epocas: 500
+
+OR
+alpha: 0.1
+max_epocas: 500
+
+XOR
+alpha: 0.1
+max_epocas: 500
+

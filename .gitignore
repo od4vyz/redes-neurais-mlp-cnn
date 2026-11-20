@@ -1,0 +1,6 @@
+Datasets/
+Material/
+ProjetoGrupo/
+*.pdf
+**/entradas/
+__pycache__/
