@@ -2,5 +2,6 @@ Datasets/
 Material/
 ProjetoGrupo/
 *.pdf
+*.xlsx
 **/entradas/
 __pycache__/
