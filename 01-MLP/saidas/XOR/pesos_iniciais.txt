@@ -1,0 +1,10 @@
+Bias da camada escondida:
+[-0.0856685 -0.3730617]
+Pesos da camada escondida:
+[[ 0.01398504 -0.20275738]
+ [ 0.09803695 -0.06872945]]
+Bias da camada de saída:
+[-0.19170573]
+Pesos da camada de saída:
+[[-0.14469927]
+ [-0.41148345]]
