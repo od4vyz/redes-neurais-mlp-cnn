@@ -1,7 +1,0 @@
-Neuronios de entrada: 2
-Neuronios escondidos: 2
-Neuronios de saida: 1
-Taxa de Aprendizado (alpha): 0.1
-Máximo de Épocas: 100
-Erro mínimo aceitável: 0
-Paciencia: 10

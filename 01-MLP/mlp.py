@@ -6,9 +6,9 @@ import os
 # np.set_printoptions(threshold=1000, linewidth=75)
 np.set_printoptions(threshold=np.inf, linewidth=np.inf, suppress=True)
 
-dataset = "XOR"
+dataset = "CARACTERES"
 
-# --------------- FUNCOES MATEMATICAS ---------------
+# ======================================== FUNCOES MATEMATICAS ========================================
 def tanh(y_in):
     """Funcao de ativacao. Encapsulamento da Tangente Hiperbolica."""
     # A Tangente Hiperbolica foi escolhida como funcao de ativacao devido ao carater do problema, que ja esta modelado em escala bipolar [-1, 1]. A utilizacao de metodo ja existente no NumPy foi considerada necessaria devido a protecao contra overflow numerico existente para a funcao
@@ -21,10 +21,10 @@ def derivada_tanh(y):
 
 def mse(t, y):
     """Calculo de Erro Quadratico Medio"""
-    # A ser utilizada no algoritmo de treinamento e validacao da rede. Recebe a saida esperada e a saida real   
-    return (0.5 * (t - y)**2) / len(t)
+    # A ser utilizada no algoritmo de treinamento e validacao da rede. Recebe a saida esperada e a saida real dos neuronios
+    return np.mean((t - y)**2)
 
-# --------------- MULTILAYER PERCEPTRON ---------------
+# ======================================== MULTILAYER PERCEPTRON ========================================
 class MLP:
     def __init__(self, n_entrada, n_escondida, n_saida, alpha, max_epocas, erro_minimo, paciencia, seed=67):
         """Inicializa a arquitetura e os hiperparametros do MLP"""
@@ -36,20 +36,23 @@ class MLP:
         self.erro_minimo = erro_minimo # Erro minimo aceitavel para interromper o treinamento
         self.paciencia = paciencia # Limite de epocas sem reducao de erro (parada antecipada)
 
-        rng = np.random.default_rng(seed) # Gerador de valores aleatorios para inicializar os pesos
+        self.rng = np.random.default_rng(seed) # Gerador de valores aleatorios para inicializar os pesos
 
         # Inicializando as matrizes de peso e os bias
-        self.v0 = rng.uniform(low=-0.5, high=0.5, size=(self.n_escondida,)) # Array de pesos do bias da camada escondida
-        self.V = rng.uniform(low=-0.5, high=0.5, size=(self.n_entrada, self.n_escondida)) # Matriz de pesos V dos neuronios da camada escondida
+        self.v0 = self.rng.uniform(low=-0.5, high=0.5, size=(self.n_escondida,)) # Array de pesos do bias da camada escondida
+        self.V = self.rng.uniform(low=-0.5, high=0.5, size=(self.n_entrada, self.n_escondida)) # Matriz de pesos V dos neuronios da camada escondida
 
-        self.w0 = rng.uniform(low=-0.5, high=0.5, size=(self.n_saida,)) # Array de pesos do bias da camada de saida
-        self.W = rng.uniform(low=-0.5, high=0.5, size=(self.n_escondida, self.n_saida)) # Matriz de pesos W dos neuronios da camada de saida
+        self.w0 = self.rng.uniform(low=-0.5, high=0.5, size=(self.n_saida,)) # Array de pesos do bias da camada de saida
+        self.W = self.rng.uniform(low=-0.5, high=0.5, size=(self.n_escondida, self.n_saida)) # Matriz de pesos W dos neuronios da camada de saida
 
         # Salva os valores inicias para gerar os logs posteriormente
         self.v0_inicial = self.v0.copy()
         self.V_inicial = self.V.copy()
         self.w0_inicial = self.w0.copy()
         self.W_inicial = self.W.copy()
+
+        self.erros_treino = []
+        self.erros_validacao = []
 
     def feedforward(self, x):
         """Propaga a entrada e retorna as ativacoes da camada"""
@@ -82,35 +85,55 @@ class MLP:
         self.v0 = self.v0 + correcao_v0
         self.V = self.V + correcao_v
 
-    def treinamento(self, X_treino, T_treino):
-        epoca = 0
+    def treinamento(self, X_treino, T_treino, X_validacao, T_validacao):
+        epoca = 0 # inicializa a contagem de epocas
+        mse_epoca = np.inf
+        menor_erro = np.inf # Armazena o menor erro de validacao obtido ate o momento
+        contador_paciencia = 0 # Contador de epocas sem melhoria na fase de validacao
 
-        while():
-            epoca += 1
+        while epoca < self.max_epocas and mse_epoca > self.erro_minimo and contador_paciencia < self.paciencia:
+            epoca += 1 
+            erros_treino = 0
 
             # Randomiza a ordem dos padroes a cada nova epoca para evitar que a rede vicie na sequencia dos dados
-            permuta = self.rng.permutation(X_treino) # Gera a ordem aleatoria de indices
+            permuta = self.rng.permutation(len(X_treino)) # Gera a ordem aleatoria de indices
             X_treino = X_treino[permuta]
             T_treino = T_treino[permuta]
 
+            for i in range(X_treino.shape[0]):
+                z_treino, y_treino = self.feedforward(X_treino[i])
+                self.backpropagation(X_treino[i], z_treino, y_treino, T_treino[i])
+                erros_treino += mse(T_treino[i], y_treino)
 
-# --------------- FUNCOES AUXILIARES ---------------
+            mse_epoca = erros_treino / X_treino.shape[0]
+            self.erros_treino.append(mse_epoca)
+
+            # Fase de validacao da rede                        
+            z, y = self.feedforward(X_validacao)
+            mse_validacao = mse(T_validacao, y)
+            self.erros_validacao.append(mse_validacao)
+            if mse_validacao < menor_erro:
+                menor_erro = mse_validacao
+                contador_paciencia = 0
+                melhor_v0 = self.v0.copy()
+                melhor_V = self.V.copy()
+                melhor_w0 = self.w0.copy()
+                melhor_W = self.W.copy()
+            else:
+                contador_paciencia += 1
+
+        # Restaura os melhores pesos encontrados para serem os pesos finais da rede
+        self.v0 = melhor_v0
+        self.V = melhor_V
+        self.w0 = melhor_w0
+        self.W = melhor_W
+
+# ======================================== FUNCOES AUXILIARES ========================================
 def carregar_dados():
     """Carrega o dataset, embaralha as amostras e divide em treino, validacao e teste."""
     rng = np.random.default_rng(42)
     
     match dataset:
-        case "XOR":
-            path_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entradas/portas-logicas", "problemXOR.csv") 
-            
-            dados = np.loadtxt(path_csv, delimiter=",", encoding="utf-8-sig")
-        
-            X_treino, T_treino = dados[:, :-1], dados[:, -1:]
-            X_validacao = T_validacao = None 
-            X_teste, T_teste = dados[:, :-1], dados[:, -1:]
-
-            return X_treino, T_treino, X_validacao, T_validacao, X_teste, T_teste
-
         case "CARACTERES":
             path_limpos = os.path.join(os.path.dirname(os.path.abspath(__file__)),"entradas", "caracteres-Fausett", "caracteres-limpo.csv")
             path_ruido = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entradas", "caracteres-Fausett", "caracteres-ruido.csv") 
@@ -119,7 +142,7 @@ def carregar_dados():
             dados_ruido = np.loadtxt(path_ruido, delimiter=",", encoding="utf-8-sig")
 
             X_treino, T_treino = dados_limpos[:, :-7], dados_limpos[:, -7:] 
-            X_validacao = T_validacao = None 
+            X_validacao, T_validacao = dados_limpos[:, :-7], dados_limpos[:, -7:]  
             X_teste, T_teste = dados_ruido[:, :-7], dados_ruido[:, -7:] 
 
             return X_treino, T_treino, X_validacao, T_validacao, X_teste, T_teste
@@ -132,7 +155,7 @@ def carregar_dados():
             dados_ruido = np.loadtxt(path_ruido, delimiter=",", encoding="utf-8-sig")
 
             X_treino, T_treino = dados_limpos[:, :-7], dados_limpos[:, -7:] 
-            X_validacao = T_validacao = None 
+            X_validacao, T_validacao = dados_limpos[:, :-7], dados_limpos[:, -7:]
             X_teste, T_teste = dados_ruido[:, :-7], dados_ruido[:, -7:] 
 
             return X_treino, T_treino, X_validacao, T_validacao, X_teste, T_teste
@@ -171,7 +194,7 @@ def escrever_txt(caminho_arquivo, conteudo):
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
         f.write(conteudo)
 
-def registrar_saida(tipo_saida, rede, dataset):
+def registrar_saida(rede, tipo_saida, dataset):
     path_saida = os.path.join(os.path.dirname(os.path.abspath(__file__)),"saidas", f"{dataset}")
     os.makedirs(path_saida, exist_ok=True)
 
@@ -179,33 +202,33 @@ def registrar_saida(tipo_saida, rede, dataset):
         "hiperparametros": os.path.join(path_saida, "hiperparametros.txt"),
         "pesos_iniciais":  os.path.join(path_saida, "pesos_iniciais.txt"),
         "pesos_finais":    os.path.join(path_saida, "pesos_finais.txt"),
-        "erros":           os.path.join(path_saida, "erros_treino.txt"),
+        "erro_treino":     os.path.join(path_saida, "erros_treino.txt"),
+        "erro_validacao":  os.path.join(path_saida, "erros_validacao.txt"),
         "saidas_teste":    os.path.join(path_saida, "saidas_teste.txt"),
     }
 
     match tipo_saida:
         case "HIPERPARAMETRO":
-            escrever_txt(arquivos["hiperparametros"], f"Neuronios de entrada: {rede.n_entrada}\n"
+            escrever_txt(arquivos["hiperparametros"], 
+                         f"Neuronios de entrada: {rede.n_entrada}\n"
                          f"Neuronios escondidos: {rede.n_escondida}\n"
                          f"Neuronios de saida: {rede.n_saida}\n"
                          f"Taxa de Aprendizado (alpha): {rede.alpha}\n"
                          f"Máximo de Épocas: {rede.max_epocas}\n"
                          f"Erro mínimo aceitável: {rede.erro_minimo}\n"
-                         f"Paciencia: {rede.paciencia}\n"
-                         ) 
+                         f"Paciencia: {rede.paciencia}\n") 
 
         case "PESOS_INICIAIS":
-            escrever_txt(arquivos["pesos_iniciais"], f"Bias da camada escondida:\n{rede.v0_inicial}\n"
-                         f"Pesos da camada escondida:\n{rede.V_inicial}\n"
-                         f"Bias da camada de saída:\n{rede.w0_inicial}\n"
-                         f"Pesos da camada de saída:\n{rede.W_inicial}\n"
-                         ) 
+            conteudo = f"Pesos iniciais da camada escondida (com Bias):\n{rede.v0_inicial}, {rede.V_inicial}\n\nPesos iniciais da camada de saída (com Bias):\n{rede.w0_inicial}, {rede.W_inicial}\n"
+            escrever_txt(arquivos["pesos_iniciais"], conteudo) 
 
         case "PESOS_FINAIS":
-            pass
+            conteudo = f"Pesos finais da camada escondida (com Bias):\n{rede.v0}, {rede.V}\n\nPesos finais da camada de saída (com Bias):\n{rede.w0}, {rede.W}\n"
+            escrever_txt(arquivos["pesos_finais"], conteudo) 
         
         case "ERRO":
-            pass
+            np.savetxt(arquivos["erro_treino"], rede.erros_treino, fmt="%.10f")
+            np.savetxt(arquivos["erro_validacao"], rede.erros_validacao, fmt="%.10f")
 
         case "SAIDAS_TESTE":
             pass
@@ -213,19 +236,18 @@ def registrar_saida(tipo_saida, rede, dataset):
         case _:
             pass
 
-# --------------- CODIGO PRINCIPAL ---------------
+# ======================================== CODIGO PRINCIPAL ========================================
 def main():
-
     X_treino, T_treino, X_validacao, T_validacao, X_teste, T_teste = carregar_dados()   
 
-    rede = MLP(X_treino.shape[1], 2, T_treino.shape[1], 0.1, 100, 0, 10)
+    rede = MLP(X_treino.shape[1], 20, T_treino.shape[1], 0.1, 500, 0.01, 10)
 
-    registrar_saida("HIPERPARAMETRO", rede, dataset)
-    registrar_saida("PESOS_INICIAIS", rede, dataset)
+    registrar_saida(rede, "HIPERPARAMETRO", dataset)
+    registrar_saida(rede, "PESOS_INICIAIS", dataset)
 
-    z, y = rede.feedforward(X_treino)
+    rede.treinamento(X_treino, T_treino, X_validacao, T_validacao)
 
-    print(z.shape)
-    print(y.shape)
+    registrar_saida(rede, "PESOS_FINAIS", dataset)
+    registrar_saida(rede, "ERRO", dataset)
 
 if __name__ == "__main__": main()
