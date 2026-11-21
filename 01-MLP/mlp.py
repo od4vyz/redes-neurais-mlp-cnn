@@ -6,7 +6,7 @@ import os
 # np.set_printoptions(threshold=1000, linewidth=75)
 np.set_printoptions(threshold=np.inf, linewidth=np.inf, suppress=True)
 
-dataset = "COMPLETO"
+dataset = "XOR"
 
 # --------------- FUNCOES MATEMATICAS ---------------
 def tanh(y_in):
@@ -18,6 +18,11 @@ def derivada_tanh(y):
     """Calculo da derivada da funcao de ativacao."""
     # A ser utilizada no algoritmo de backpropagation. Recebe a saida ja ativada do neuronio
     return 1 - (y**2)
+
+def mse(t, y):
+    """Calculo de Erro Quadratico Medio"""
+    # A ser utilizada no algoritmo de treinamento e validacao da rede. Recebe a saida esperada e a saida real   
+    return (0.5 * (t - y)**2) / len(t)
 
 # --------------- MULTILAYER PERCEPTRON ---------------
 class MLP:
@@ -47,6 +52,7 @@ class MLP:
         self.W_inicial = self.W.copy()
 
     def feedforward(self, x):
+        """Propaga a entrada e retorna as ativacoes da camada"""
         z_in = self.v0 + (x @ self.V)
         z = tanh(z_in)
 
@@ -54,6 +60,38 @@ class MLP:
         y = tanh(y_in)
 
         return z, y
+
+    def backpropagation(self, x, z, y, t):
+
+        # Calcula o erro da camada de saida e propaga para a camada escondida
+        delta_k = (t - y) * derivada_tanh(y) # Calcula o erro da camada de saída multiplicando o erro bruto de cada neuronio pela sensibilidade do neuronio
+        # utiliza esse erro para calcular a matriz de correcao dos pesos da camada
+        correcao_w = self.alpha * np.outer(z, delta_k)
+        correcao_w0 = self.alpha * delta_k
+
+        # Calcula o erro da camada escondida e propaga para a camada de entrada
+        delta_in_j = delta_k @ self.W.T # Calcula o erro bruto dos neuronios da camada escondida utilizando o erro da camada de saida e os pesos daquelas conexoes
+        delta_j = delta_in_j * derivada_tanh(z) # multiplica o erro bruto pela sensibilidade para calcular o erro da camada escondida
+        # utiliza esse erro para calcular a matriz de correcao dos pesos da camada
+        correcao_v = self.alpha * np.outer(x, delta_j)
+        correcao_v0 = self.alpha * delta_j
+
+        # Recalcula e ajusta os pesos de toda a rede
+        self.w0 = self.w0 + correcao_w0
+        self.W = self.W + correcao_w
+        self.v0 = self.v0 + correcao_v0
+        self.V = self.V + correcao_v
+
+    def treinamento(self, X_treino, T_treino):
+        epoca = 0
+
+        while():
+            epoca += 1
+
+            # Randomiza a ordem dos padroes a cada nova epoca para evitar que a rede vicie na sequencia dos dados
+            permuta = self.rng.permutation(X_treino) # Gera a ordem aleatoria de indices
+            X_treino = X_treino[permuta]
+            T_treino = T_treino[permuta]
 
 
 # --------------- FUNCOES AUXILIARES ---------------
@@ -180,7 +218,7 @@ def main():
 
     X_treino, T_treino, X_validacao, T_validacao, X_teste, T_teste = carregar_dados()   
 
-    rede = MLP(X_treino.shape[1], 80, T_treino.shape[1], 0.1, 100, 0, 10)
+    rede = MLP(X_treino.shape[1], 2, T_treino.shape[1], 0.1, 100, 0, 10)
 
     registrar_saida("HIPERPARAMETRO", rede, dataset)
     registrar_saida("PESOS_INICIAIS", rede, dataset)
